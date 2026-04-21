@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ULTRA-MARKET 3.0 | Қызметтер нарығы</title>
+    <script src="https://tailwindcss.com"></script>
+    <link href="https://cloudflare.com" rel="stylesheet">
+    <style>
+        @import url('https://googleapis.com');
+        
+        :root {
+            --neon: #00ff41; /* Матрица жасылы */
+            --bg: #050505;
+            --hot-pink: #ff0055;
+        }
+
+        body {
+            font-family: 'Exo 2', sans-serif;
+            background-color: var(--bg);
+            color: white;
+            background-image: linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px), 
+                              linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            overflow-x: hidden;
+        }
+
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+
+        /* КҮШТІ ТӨЛЕМ ПАНЕЛІ (SIDEBAR) */
+        #buyModal {
+            display: flex;
+            position: fixed;
+            top: 0;
+            right: -100%; 
+            width: 100%;
+            max-width: 450px;
+            height: 100%;
+            background: linear-gradient(180deg, #0a0a0a 0%, #111 100%);
+            border-left: 4px solid var(--neon);
+            z-index: 10000;
+            transition: 0.5s cubic-bezier(0.85, 0, 0.15, 1);
+            box-shadow: -15px 0 50px rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+        }
+
+        #buyModal.open { right: 0; }
+
+        .pay-option {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            position: relative;
+            overflow: hidden;
+            transition: 0.2s;
+        }
+
+        .pay-option:hover {
+            border-color: var(--neon);
+            background: #222;
+            transform: translateX(-5px);
+        }
+
+        .pay-option::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; height: 100%; width: 4px;
+            background: var(--neon);
+            transform: scaleY(0);
+            transition: 0.2s;
+        }
+
+        .pay-option:hover::before { transform: scaleY(1); }
+
+        .price-badge {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px dashed var(--neon);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .close-area {
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #555;
+            transition: 0.3s;
+        }
+
+        .close-area:hover { color: var(--hot-pink); transform: rotate(90deg); }
+
+        /* НЕГІЗГІ СТИЛЬДЕР */
+        .filter-tab {
+            background: #111; border: 2px solid #222; padding: 12px 25px;
+            font-weight: 900; text-transform: uppercase; cursor: pointer; transition: 0.2s;
+        }
+        .filter-tab:hover, .filter-tab.active {
+            border-color: var(--neon); color: var(--neon); box-shadow: 0 0 10px var(--neon);
+        }
+
+        .action-btn {
+            background: var(--neon); color: black; font-weight: 900;
+            padding: 15px 35px; text-transform: uppercase; cursor: pointer; transition: 0.3s;
+        }
+
+        .buy-trigger {
+            background: var(--hot-pink); color: white; padding: 12px;
+            font-weight: 900; cursor: pointer; transition: 0.2s; width: 100%; border: none;
+        }
+        .buy-trigger:hover { background: white; color: var(--hot-pink); }
+
+        .card { background: rgba(20, 20, 25, 0.9); border: 2px solid #222; padding: 15px; transition: 0.3s; }
+        .card:hover { border-color: var(--neon); transform: translateY(-5px); }
+
+        #overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay" onclick="closeBuyModal()"></div>
+
+    <!-- HEADER -->
+    <nav class="max-w-7xl mx-auto flex justify-between items-center py-10 px-4">
+        <div class="text-3xl font-black orbitron italic text-white tracking-widest">
+            IT_MKT <span class="text-green-500 underline decoration-double">2026</span>
+        </div>
+        <button onclick="openAddModal()" class="action-btn">ҚЫЗМЕТ ҚОСУ +</button>
+    </nav>
+
+    <!-- FILTERS -->
+    <div class="max-w-7xl mx-auto mb-10 flex flex-wrap gap-3 justify-center">
+        <button onclick="filter('all')" class="filter-tab active">БАРЛЫҒЫ</button>
+        <button onclick="filter('gfx')" class="filter-tab">ДИЗАЙН</button>
+        <button onclick="filter('soft')" class="filter-tab">СОФТ</button>
+        <button onclick="filter('music')" class="filter-tab">ДЫБЫС</button>
+    </div>
+
+    <!-- КАТАЛОГ -->
+    <main id="catalog" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-4 mb-20"></main>
+
+    <!-- !!! ЖАҢА КҮШТІ ТӨЛЕМ МӘЗІРІ !!! -->
+    <div id="buyModal">
+        <div class="p-8 flex-1 flex flex-col h-full">
+            <div class="flex justify-between items-center mb-12">
+                <div class="orbitron text-[10px] tracking-[4px] text-zinc-500">SECURE_PAYMENT_GATEWAY</div>
+                <div onclick="closeBuyModal()" class="close-area">✕</div>
+            </div>
+
+            <div class="mb-10">
+                <span class="text-zinc-600 text-[10px] font-black uppercase tracking-widest block mb-2">Таңдалған қызмет:</span>
+                <h2 id="m-name" class="text-3xl font-black uppercase italic tracking-tighter leading-none mb-6">НАЗВАНИЕ</h2>
+                
+                <div class="price-badge">
+                    <span class="text-zinc-400 text-xs block mb-1 uppercase font-bold">Төлеуге:</span>
+                    <div id="m-price" class="text-4xl font-black text-green-500 orbitron italic">0 ₸</div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <p class="text-[10px] font-black text-zinc-500 uppercase tracking-[3px] mb-4">Төлем арнасын таңдаңыз:</p>
+                
+                <div class="pay-option p-5 flex items-center gap-5 cursor-pointer group">
+                    <div class="w-12 h-12 bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-green-500">
+                        <i class="fas fa-credit-card text-xl group-hover:text-green-500"></i>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm uppercase">Банк картасы</div>
+                        <div class="text-[9px] text-zinc-500">VISA / MASTERCARD / МИР</div>
+                    </div>
+                </div>
+
+                <div class="pay-option p-5 flex items-center gap-5 cursor-pointer group">
+                    <div class="w-12 h-12 bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-yellow-500">
+                        <i class="fab fa-bitcoin text-xl group-hover:text-yellow-500"></i>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm uppercase">Криптовалюта</div>
+                        <div class="text-[9px] text-zinc-500">USDT / BTC (0% комиссия)</div>
+                    </div>
+                </div>
+
+                <div class="pay-option p-5 flex items-center gap-5 cursor-pointer group">
+                    <div class="w-12 h-12 bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-blue-400">
+                        <i class="fas fa-qrcode text-xl group-hover:text-blue-400"></i>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm uppercase">Kaspi.kz</div>
+                        <div class="text-[9px] text-zinc-500">QR арқылы жылдам төлем</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-auto">
+                <button onclick="alert('Төлем қабылданды!')" class="action-btn w-full !py-6 text-xl shadow-[0_10px_30px_rgba(0,255,65,0.2)]">
+                    ТӨЛЕМДІ РАСТАУ
+                </button>
+                <div class="mt-6 flex items-center justify-center gap-2 text-[8px] text-zinc-600 uppercase font-bold tracking-widest">
+                    <i class="fas fa-shield-alt"></i> SSL 256-BIT ENCRYPTION ACTIVE
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ҚОСУ МОДАЛКАСЫ -->
+    <div id="addModal" class="fixed inset-0 bg-black/95 z-[11000] hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border-4 border-white p-8 max-w-lg w-full">
+            <h2 class="text-3xl font-black mb-6 italic uppercase">ЖАҢА ҚЫЗМЕТ</h2>
+            <input type="text" placeholder="АТАУЫ" class="w-full bg-black border-2 border-zinc-700 p-4 mb-4 outline-none focus:border-green-500 text-white font-bold">
+            <input type="number" placeholder="БАҒАСЫ (₸)" class="w-full bg-black border-2 border-zinc-700 p-4 mb-4 outline-none focus:border-green-500 text-white font-bold">
+            <textarea placeholder="СИПАТТАМАСЫ" class="w-full bg-black border-2 border-zinc-700 p-4 mb-6 h-24 outline-none focus:border-green-500 text-white"></textarea>
+            <div class="flex gap-4">
+                <button class="action-btn w-full" onclick="closeAddModal()">ЖАРЫЯЛАУ</button>
+                <button class="bg-zinc-700 px-6 font-bold text-white" onclick="closeAddModal()">X</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const services = [
+            {id: 1, name: "Глитч логотипі", price: "15 000", cat: "gfx", img: "https://img.freepik.com/free-vector/glitch-vhs-text-effect-editable-error-hacker-text-style_314614-2158.jpg?semt=ais_hybrid&w=740&q=80"},
+            {id: 2, name: "Phonk өңдеу", price: "7 500", cat: "music", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZ_kQXU48G9Aa5YvjXGALRuBydl7wM6cnyuA&s "},
+            {id: 3, name: "Telegram Бот", price: "25 000", cat: "soft", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSmJ3add7CJGjFa3AQDniaRrcrie1OxPRKQWQ&s"},
+            {id: 4, name: "Бизнес Презентация", price: "12 000", cat: "gfx", img: "https://static.rfstat.com/gm-media/template/198/b37bb37d6d7f_1x.webp"},
+            {id: 5, name: "Мастеринг (Дыбыс)", price: "40 000", cat: "music", img: "https://acousticrecords.ru/wp-content/uploads/2020/05/%D0%9C%D0%B0%D1%81%D1%82%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D1%81%D1%82%D1%83%D0%B4%D0%B8%D1%8F-Acoustic-Records.jpg"},
+            {id: 6, name: "Парсер жасау", price: "30 000", cat: "soft", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL-RR75jh_lAwGgatW54_1PHx6wq96SWjR_A&s"},
+            {id: 7, name: "3D Модельдеу", price: "55 000", cat: "gfx", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT96OHxuOaEfGPj_0wt4En8dtyVzIVepdTbuw&s"},
+            {id: 8, name: "Windows Оптимизация", price: "5 000", cat: "soft", img: "https://i.ytimg.com/vi/jh4ECtiJA9E/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLAZe-kM3FpeDDHpagrLHSmRY2at2Q"},
+            {id: 9, name: "Видео Монтаж", price: "10 000", cat: "gfx", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTGRxOB5ndnNjhfIWYUcMnhVxSViArophQkSg&s"},
+            {id: 10, name: "UI/UX Дизайн", price: "80 000", cat: "gfx", img: "https://ruweb.net/static/images/articles/pro-uiux-dizajn-prostymi-slovami/image1.png"},
+            {id: 11, name: "Скрипт Автокликера", price: "3 500", cat: "soft", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR7ZXchHiKcq5JNLabk7CiCicS_bu0UeyCo-w&s"},
+            {id: 12, name: "Custom Beat", price: "24 999", cat: "music", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSHEcDWWoRV2kvPoOTIdoc93uJvOE-etTN_sQ&s"},
+            {id: 13, name: "Excel Проект", price: "ү 500", cat: "gfx", img: "https://i.ytimg.com/vi/CPCj8VDn_yI/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLAFAb3BcgBVoNgzBkfQiv1qLzoPsw"},
+            {id: 14, name: "Word Проект", price: "7 500", cat: "gfx", img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSwebfAKz97z6SJoxNE3rapPQWAQGIqQcismA&s"},
+        ];
+
+        function render(items) {
+            const container = document.getElementById('catalog');
+            container.innerHTML = '';
+            items.forEach(s => {
+                container.innerHTML += `
+                    <div class="card">
+                        <img src="${s.img}" class="w-full h-44 object-cover mb-4 grayscale hover:grayscale-0 transition-all duration-500 border border-zinc-800">
+                        <h3 class="text-lg font-black mb-4 h-12 overflow-hidden uppercase leading-tight">${s.name}</h3>
+                        <div class="text-2xl font-black mb-6 italic text-green-500">${s.price} ₸</div>
+                        <button onclick="openBuyModal('${s.name}', '${s.price}')" class="buy-trigger uppercase">Сатып алу</button>
+                    </div>
+                `;
+            });
+        }
+
+        function openBuyModal(name, price) {
+            document.getElementById('m-name').innerText = name;
+            document.getElementById('m-price').innerText = price + ' ₸';
+            document.getElementById('buyModal').classList.add('open');
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeBuyModal() {
+            document.getElementById('buyModal').classList.remove('open');
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+        function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
+        function filter(cat) {
+            document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            if(cat === 'all') render(services);
+            else render(services.filter(s => s.cat === cat));
+        }
+
+        render(services);
+    </script>
+</body>
+</html>
